@@ -1,6 +1,9 @@
 function [S, rawVarNames] = readDataGrabberLog(infile)
 % [S, rawVarNames] = readDataGrabberLog(infile)
 
+% TODO: support zipped input files
+
+
 REF_DATENUM = datenum('1970-01-01 00:00:00');
 I_FIRST_VAR = 5; % Time [ms],Date,Time,Rel.Time [s]
 MS2DAY = 1000*60*60*24;
@@ -20,6 +23,11 @@ rawVarNames = rawVarNames(I_FIRST_VAR:end);
 varNames = matlab.lang.makeValidName(rawVarNames);
 varNames = matlab.lang.makeUniqueStrings(varNames);
 nVar = numel(varNames);
+
+if nVar<1
+    S=struct(); 
+    return;
+end
 
 frmt = ['%f %s %s %f' repmat(' %f',1,nVar)];
 data = textscan(fid,frmt,'Delimiter',',');
