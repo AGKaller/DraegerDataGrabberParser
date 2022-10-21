@@ -7,7 +7,7 @@ function [S, rawVarNames] = readDataGrabberLog(infile)
 REF_DATENUM = datenum('1970-01-01 00:00:00');
 I_FIRST_VAR = 5; % Time [ms],Date,Time,Rel.Time [s]
 MS2DAY = 1000*60*60*24;
-PROGBARSIZ = 20; % progress bar size
+PROGBARSIZ = 10; % progress bar size
 
 
 % get number of rows
@@ -27,7 +27,7 @@ nVar = numel(varNames);
 
 [~,fnam] =  fileparts(infile);
 finfo = dir(infile);
-fprintf('Loading ''%s'': %.1fMB, %d variables. ', ...
+fprintf('Loading ''%s'':\n\t%.1fMB, %d variables: ', ...
     fnam, finfo.bytes/2^20, nVar);
 
 if nVar<1
@@ -42,8 +42,11 @@ CHNKSZ = 1e6;
 DELIM = ',';
 data = [];
 
+msgSiz = fprintf('%3.0f%% [%s]', 0, repmat(' ',1,PROGBARSIZ));
+bytesRead = 0;
 while ~feof(fid)
     dataChnk = fread(fid,[1,CHNKSZ], 'uint8=>char');
+    bytesRead = bytesRead + CHNKSZ;
     if ~feof(fid)
         dataChnk = [dataChnk fgets(fid)];
     end
@@ -53,13 +56,19 @@ while ~feof(fid)
     dataChnk = strjoin(dataChnk',DELIM);
     dataChnk = textscan(dataChnk,scanFrmt,'Delimiter',DELIM);
     data = [data; horzcat(dataChnk{:})];
+
+    perc  = bytesRead/finfo.bytes;
+    nBar = round(perc*PROGBARSIZ);
+    fprintf(repmat('\b',1,msgSiz));
+    msgSiz = fprintf('%3.0f%% [%s%s]', ...
+        perc*100, repmat('|',1,nBar), repmat(' ',1,PROGBARSIZ-nBar));
 end
 
 fclose(fid);
 
 nrows = size(data,1);
 lreadSiz = ceil(log10(nrows+1));
-fprintf('%*d lines read\n', ...
+fprintf('. %*d lines read\n', ...
             lreadSiz, nrows);
 
 % convert time stamp
