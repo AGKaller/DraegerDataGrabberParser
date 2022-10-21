@@ -36,48 +36,41 @@ if nVar<1
     return;
 end
 
-frmt = ['%f %*10c %*12c %*f' repmat(' %f',1,nVar)];
-data = textscan(fid,'%s','Delimiter','\n');
-% TODO: better use fread() to read chunk (take care of memory!) into single
-% vector, replace empty values ',,' by ',*,' to be handled by textscan
-% ('TreatAsEmpty' parameter) and remove additional colums (see 22-10-14...)
-% using regexprep(). Is this still faster? It is some code to write....
+scanFrmt = ['%f %*10c %*12c %*f' repmat(' %f',1,nVar)];
+mtchFrmt = ['^' repmat('([^,\n]*),',1,I_FIRST_VAR+nVar-2) '([^,\n]*)[^\n]*$'];
+CHNKSZ = 1e6;
+DELIM = ',';
+data = [];
+
+while ~feof(fid)
+    dataChnk = fread(fid,[1,CHNKSZ], 'uint8=>char');
+    if ~feof(fid)
+        dataChnk = [dataChnk fgets(fid)];
+    end
+    dataChnk = regexp(dataChnk,mtchFrmt,'tokens','lineanchors');
+    dataChnk = vertcat(dataChnk{:});
+    if isempty(dataChnk{end}), dataChnk{end} = ' '; end
+    dataChnk = strjoin(dataChnk',DELIM);
+    dataChnk = textscan(dataChnk,scanFrmt,'Delimiter',DELIM);
+    data = [data; horzcat(dataChnk{:})];
+end
 
 fclose(fid);
-data = data{1};
 
-% preallocate output
-nrows = numel(data);
-nVar = numel(varNames);
-vals = cell(nrows,nVar+1);
-
+nrows = size(data,1);
 lreadSiz = ceil(log10(nrows+1));
-msgSiz = fprintf('%*d/%d lines read,   0%% [%s]',lreadSiz, 0, nrows, repmat(' ',1,PROGBARSIZ));
-for il = 1:nrows
-    vals(il,:) = textscan(data{il},frmt,'Delimiter',',');
-    if rem(il,1000)==0
-        perc  = il/nrows;
-        nBar = round(perc*PROGBARSIZ);
-        fprintf(repmat('\b',1,msgSiz));
-        msgSiz = fprintf('%*d/%d lines read, % 3.0f%% [%s%s]', ...
-            lreadSiz, il, nrows, perc*100, repmat('|',1,nBar), repmat(' ',1,PROGBARSIZ-nBar));
-    end
-end
-fprintf(repmat('\b',1,msgSiz));
-fprintf('%*d/%d lines read, 100%% [%s]\n', ...
-            lreadSiz, il, nrows, repmat('|',1,progBarSiz));
+fprintf('%*d lines read\n', ...
+            lreadSiz, nrows);
 
-... TODO: process values
-data{1} = data{1}/MS2DAY + REF_DATENUM;
+% convert time stamp
+data(:,1) = data(:,1)/MS2DAY + REF_DATENUM;
 
 % make output
 for k = 1:nVar
-    cidx = I_FIRST_VAR+k-1;
-    ridx = ~isnan(data{cidx});
-    S.(varNames{k}) = [data{1}(ridx) data{cidx}(ridx)];
+    cidx = k+1;
+    ridx = ~isnan(data(:,cidx));
+    S.(varNames{k}) = [data(ridx,1) data(ridx,cidx)];
 end
-
-fprintf(' %d lines.\n',numel(data{1}));
 
 end
 
