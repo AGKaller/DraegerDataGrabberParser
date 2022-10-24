@@ -33,6 +33,7 @@ fprintf('Loading ''%s'':\n\t%.1fMB, %d variables: ', ...
 if nVar<1
     S=struct();
     fprintf('\n');
+    fclose(fid);
     return;
 end
 
@@ -43,24 +44,31 @@ DELIM = ',';
 data = [];
 
 msgSiz = fprintf('%3.0f%% [%s]', 0, repmat(' ',1,PROGBARSIZ));
-while ~feof(fid)
-    dataChnk = fread(fid,[1,CHNKSZ], 'uint8=>char');
-    if ~feof(fid)
-        dataChnk = [dataChnk fgets(fid)];
+try
+    while ~feof(fid)
+        dataChnk = fread(fid,[1,CHNKSZ], 'uint8=>char');
+        if ~feof(fid)
+            dataChnk = [dataChnk fgets(fid)];
+        end
+    
+        dataChnk = regexp(dataChnk,mtchFrmt,'tokens','lineanchors');
+        dataChnk = vertcat(dataChnk{:});
+        if isempty(dataChnk{end}), dataChnk{end} = ' '; end
+        dataChnk = strjoin(dataChnk',DELIM);
+        dataChnk = textscan(dataChnk,scanFrmt,'Delimiter',DELIM);
+        data = [data; horzcat(dataChnk{:})];
+    
+        perc  = ftell(fid)/finfo.bytes;
+        nBar = round(perc*PROGBARSIZ);
+        fprintf(repmat('\b',1,msgSiz));
+        msgSiz = fprintf('%3.0f%% [%s%s]', ...
+            perc*100, repmat('|',1,nBar), repmat(' ',1,PROGBARSIZ-nBar));
     end
 
-    dataChnk = regexp(dataChnk,mtchFrmt,'tokens','lineanchors');
-    dataChnk = vertcat(dataChnk{:});
-    if isempty(dataChnk{end}), dataChnk{end} = ' '; end
-    dataChnk = strjoin(dataChnk',DELIM);
-    dataChnk = textscan(dataChnk,scanFrmt,'Delimiter',DELIM);
-    data = [data; horzcat(dataChnk{:})];
-
-    perc  = ftell(fid)/finfo.bytes;
-    nBar = round(perc*PROGBARSIZ);
-    fprintf(repmat('\b',1,msgSiz));
-    msgSiz = fprintf('%3.0f%% [%s%s]', ...
-        perc*100, repmat('|',1,nBar), repmat(' ',1,PROGBARSIZ-nBar));
+catch ME
+    fprintf('\n');
+    flcose(fid);
+    rethrow(ME);
 end
 
 fclose(fid);
