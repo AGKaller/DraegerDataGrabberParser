@@ -37,19 +37,18 @@ if nVar<1
 end
 
 scanFrmt = ['%f %*10c %*12c %*f' repmat(' %f',1,nVar)];
-mtchFrmt = ['^' repmat('([^,\n]*),',1,I_FIRST_VAR+nVar-2) '([^,\n]*)[^\n]*$'];
-CHNKSZ = 1e6;
+mtchFrmt = ['^' repmat('([^,\n]*),?',1,I_FIRST_VAR+nVar-2) '([^,\n]*)[^\n]*$'];
+CHNKSZ = 1e7;
 DELIM = ',';
 data = [];
 
 msgSiz = fprintf('%3.0f%% [%s]', 0, repmat(' ',1,PROGBARSIZ));
-bytesRead = 0;
 while ~feof(fid)
     dataChnk = fread(fid,[1,CHNKSZ], 'uint8=>char');
-    bytesRead = bytesRead + CHNKSZ;
     if ~feof(fid)
         dataChnk = [dataChnk fgets(fid)];
     end
+
     dataChnk = regexp(dataChnk,mtchFrmt,'tokens','lineanchors');
     dataChnk = vertcat(dataChnk{:});
     if isempty(dataChnk{end}), dataChnk{end} = ' '; end
@@ -57,7 +56,7 @@ while ~feof(fid)
     dataChnk = textscan(dataChnk,scanFrmt,'Delimiter',DELIM);
     data = [data; horzcat(dataChnk{:})];
 
-    perc  = bytesRead/finfo.bytes;
+    perc  = ftell(fid)/finfo.bytes;
     nBar = round(perc*PROGBARSIZ);
     fprintf(repmat('\b',1,msgSiz));
     msgSiz = fprintf('%3.0f%% [%s%s]', ...
